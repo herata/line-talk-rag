@@ -1,7 +1,7 @@
 import { CloudflareWorkersAIEmbeddings } from "@langchain/cloudflare";
 import { CloudflareVectorizeStore } from "@langchain/cloudflare";
 import { Document } from "@langchain/core/documents";
-import { validateSignature } from "@line/bot-sdk";
+import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { Hono } from "hono";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
@@ -21,6 +21,10 @@ app.get("/", (c) => {
 		message: "LINE Talk RAG System",
 		version: "1.0.0",
 		endpoints: ["/prepare", "/webhook"],
+		features: {
+			echoBot: "enabled",
+			ragPipeline: "available (commented out)",
+		}
 	});
 });
 
@@ -88,58 +92,98 @@ app.post("/webhook", async (c) => {
 			return c.json({ error: "Invalid signature" }, 400);
 		}
 
+		const client = new messagingApi.MessagingApiClient({
+			channelAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+		});
+
 		// Parse webhook events
 		const events = JSON.parse(body).events;
 
 		for (const event of events) {
-			if (event.type === "message" && event.message.type === "text") {
-				const userMessage = event.message.text;
+			try {
+				if (event.type === "message" && event.message.type === "text") {
+					const userMessage = event.message.text;
 
-				// Initialize embeddings
-				const embeddings = new CloudflareWorkersAIEmbeddings({
-					binding: c.env.AI,
-					modelName: "@cf/baai/bge-m3",
-				});
+					// === RAG Implementation (Commented for Echo Bot Testing) ===
+					// // Initialize embeddings
+					// const embeddings = new CloudflareWorkersAIEmbeddings({
+					// 	binding: c.env.AI,
+					// 	modelName: "@cf/baai/bge-m3",
+					// });
 
-				// Initialize vector store for similarity search
-				const vectorStore = new CloudflareVectorizeStore(embeddings, {
-					index: c.env.VECTORIZE,
-				});
+					// // Initialize vector store for similarity search
+					// const vectorStore = new CloudflareVectorizeStore(embeddings, {
+					// 	index: c.env.VECTORIZE,
+					// });
 
-				// Search for relevant documents
-				const results = await vectorStore.similaritySearch(userMessage, 3);
+					// // Search for relevant documents
+					// const results = await vectorStore.similaritySearch(userMessage, 3);
 
-				// Prepare context for LLM
-				const context = results.map((doc) => doc.pageContent).join("\n\n");
+					// // Prepare context for LLM
+					// const context = results.map((doc) => doc.pageContent).join("\n\n");
 
-				// Generate response using Workers AI LLM
-				const aiResponse = (await c.env.AI.run(
-					"@cf/meta/llama-2-7b-chat-int8",
-					{
+					// // Generate response using Workers AI LLM
+					// const aiResponse = (await c.env.AI.run(
+					// 	"@cf/meta/llama-2-7b-chat-int8",
+					// 	{
+					// 		messages: [
+					// 			{
+					// 				role: "system",
+					// 				content:
+					// 					"You are a helpful assistant that answers questions based on the provided context from LINE chat history. If the context doesn't contain relevant information, say so politely.",
+					// 			},
+					// 			{
+					// 				role: "user",
+					// 				content: `Context from chat history:\n${context}\n\nQuestion: ${userMessage}`,
+					// 			},
+					// 		],
+					// 	},
+					// )) as { response: string };
+
+					// // Extract response text from AI response
+					// const responseText =
+					// 	aiResponse.response || "Sorry, I couldn't generate a response.";
+
+					// // Send reply to LINE (Note: This is a simplified example)
+					// // In production, you would use LINE Messaging API to send replies
+					// console.log("Generated response:", responseText);
+					// === End of RAG Implementation ===
+
+					// Echo Bot Implementation for Testing
+					const echoMessage = `Echo: ${userMessage}`;
+					
+					await client.replyMessage({
+						replyToken: event.replyToken,
 						messages: [
 							{
-								role: "system",
-								content:
-									"You are a helpful assistant that answers questions based on the provided context from LINE chat history. If the context doesn't contain relevant information, say so politely.",
-							},
-							{
-								role: "user",
-								content: `Context from chat history:\n${context}\n\nQuestion: ${userMessage}`,
-							},
+								type: "text",
+								text: echoMessage,
+							}
 						],
-					},
-				)) as { response: string };
+					});
+					
+					console.log("Echo reply sent successfully:", echoMessage);
 
-				// Extract response text from AI response
-				const responseText =
-					aiResponse.response || "Sorry, I couldn't generate a response.";
-
-				// Send reply to LINE (Note: This is a simplified example)
-				// In production, you would use LINE Messaging API to send replies
-				console.log("Generated response:", responseText);
-
-				// TODO: Implement actual LINE reply using @line/bot-sdk
-				// For now, we just log the response
+				} else if (event.type === "follow") {
+					// Handle follow event (user adds bot as friend)
+					await client.replyMessage({
+						replyToken: event.replyToken,
+						messages: [
+							{
+								type: "text",
+								text: "Thanks for adding me! Send me any message and I'll echo it back to you. 🤖\n\n(This is currently in Echo Bot mode for testing. RAG functionality is available but commented out.)",
+							}
+						],
+					});
+					
+					console.log("Welcome message sent for follow event");
+				
+				} else {
+					console.log("Unhandled event type:", event.type);
+				}
+			} catch (eventError) {
+				console.error("Error processing event:", eventError);
+				// Continue processing other events even if one fails
 			}
 		}
 
