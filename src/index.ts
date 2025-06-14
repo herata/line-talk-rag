@@ -22,7 +22,8 @@ app.get("/", (c) => {
 		version: "1.0.0",
 		endpoints: ["/prepare", "/webhook"],
 		features: {
-			echoBot: "enabled",
+			workersAI: "enabled (testing mode)",
+			echoBot: "fallback enabled",
 			ragPipeline: "available (commented out)",
 		}
 	});
@@ -149,20 +150,59 @@ app.post("/webhook", async (c) => {
 					// console.log("Generated response:", responseText);
 					// === End of RAG Implementation ===
 
-					// Echo Bot Implementation for Testing
-					const echoMessage = `Echo: ${userMessage}`;
-					
-					await client.replyMessage({
-						replyToken: event.replyToken,
-						messages: [
+					// === Workers AI LLM Test Implementation ===
+					try {
+						// Generate response using Workers AI LLM
+						const aiResponse = (await c.env.AI.run(
+							"@cf/meta/llama-2-7b-chat-int8",
 							{
-								type: "text",
-								text: echoMessage,
+								messages: [
+									{
+										role: "system",
+										content: "You are a helpful and friendly AI assistant. Respond to the user's message in a natural, conversational way. Keep your responses concise and engaging."
+									},
+									{
+										role: "user",
+										content: userMessage
+									}
+								]
 							}
-						],
-					});
-					
-					console.log("Echo reply sent successfully:", echoMessage);
+						)) as { response: string };
+
+						// Extract response text from AI response
+						const responseText = aiResponse.response || "Sorry, I couldn't generate a response.";
+
+						await client.replyMessage({
+							replyToken: event.replyToken,
+							messages: [
+								{
+									type: "text",
+									text: responseText,
+								}
+							],
+						});
+						
+						console.log("AI response sent successfully:", responseText);
+						
+					} catch (aiError) {
+						console.error("AI generation failed, falling back to echo:", aiError);
+						
+						// Fallback to Echo Bot if AI fails
+						const echoMessage = `Echo: ${userMessage}`;
+						
+						await client.replyMessage({
+							replyToken: event.replyToken,
+							messages: [
+								{
+									type: "text",
+									text: echoMessage,
+								}
+							],
+						});
+						
+						console.log("Echo fallback reply sent:", echoMessage);
+					}
+					// === End of Workers AI LLM Test Implementation ===
 
 				} else if (event.type === "follow") {
 					// Handle follow event (user adds bot as friend)
@@ -171,7 +211,7 @@ app.post("/webhook", async (c) => {
 						messages: [
 							{
 								type: "text",
-								text: "Thanks for adding me! Send me any message and I'll echo it back to you. 🤖\n\n(This is currently in Echo Bot mode for testing. RAG functionality is available but commented out.)",
+								text: "Thanks for adding me! I'm now powered by Workers AI and can have conversations with you. 🤖✨\n\n(Currently in AI testing mode with Echo Bot fallback. RAG functionality is available but commented out.)",
 							}
 						],
 					});
