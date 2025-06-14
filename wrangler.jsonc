@@ -2,7 +2,19 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "line-talk-rag",
   "main": "src/index.ts",
-  "compatibility_date": "2025-06-14"
+  "compatibility_date": "2025-06-14",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "line-talk-rag-index"
+    }
+  ]
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],

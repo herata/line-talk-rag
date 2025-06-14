@@ -1,0 +1,9 @@
+# Line Bot Configuration
+LINE_CHANNEL_SECRET=your_line_channel_secret_here
+LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token_here
+
+# Development Notes:
+# 1. Get LINE_CHANNEL_SECRET from LINE Developers Console > Your Bot > Channel Secret
+# 2. Get LINE_CHANNEL_ACCESS_TOKEN from LINE Developers Console > Your Bot > Channel Access Token
+# 3. Copy this file to .dev.vars for local development
+# 4. Use `wrangler secret` command to set production secrets
