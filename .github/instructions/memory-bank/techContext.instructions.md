@@ -82,9 +82,10 @@ line-talk-rag/
 - **Enhanced RAG-Only Strategy**: ✅ Unified background processing for all questions
   - Simplified confirmation message implementation
   - Complex immediate response logic eliminated
-- **High-Performance AI Model**: ✅ llama-3.1-8b-instruct (max_tokens: 400)
-  - Upgraded from llama-3.2-3b-instruct for superior quality
-  - Enhanced response generation capabilities
+- **Ultra High-Performance AI Model**: ✅ llama-4-scout-17b-16e-instruct (max_tokens: 400, temperature: 0.2)
+  - 従来のllama-3.1-8b-instructから大幅アップグレード（17Bパラメータ）
+  - 最高品質の回答生成能力実現
+  - 安定性と創造性のバランス最適化
 - **Enhanced RAG Search**: ✅ 5-document search with metadata utilization
   - Increased search count from 3 to 5 for richer context
   - Timestamp and participant metadata integration

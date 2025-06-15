@@ -13,7 +13,7 @@ To ensure I have the most up-to-date context, this file should be very flexible 
 
 #### Enhanced RAG Strategy Implementation (100%) - 最新
 - **RAG-Only Strategy**: 即時回答システム削除、全質問をバックグラウンドRAG処理に統一 ✅
-- **High-Performance AI Model**: llama-3.1-8b-instruct搭載（max_tokens: 400） ✅
+- **Ultra High-Performance AI Model**: llama-4-scout-17b-16e-instruct搭載（max_tokens: 400, temperature: 0.2） ✅
 - **Enhanced RAG Search**: 検索件数5件、メタデータ活用詳細コンテキスト ✅
 - **Simplified User Experience**: シンプル確認メッセージ実装 ✅
 - **Comprehensive Prompt Engineering**: より詳細で効果的なプロンプト設計 ✅
@@ -52,7 +52,7 @@ To ensure I have the most up-to-date context, this file should be very flexible 
   - Unified background processing for all questions
   - Simplified confirmation message implementation
   - Enhanced search capabilities (5 documents vs 3)
-- **High-Performance AI Integration**: llama-3.1-8b-instruct model ✅
+- **Ultra High-Performance AI Integration**: llama-4-scout-17b-16e-instruct model ✅
   - Upgraded from llama-3.2-3b-instruct for better quality
   - max_tokens increased to 400 for more detailed responses
   - Optimized prompt engineering for Japanese context
@@ -96,7 +96,7 @@ To ensure I have the most up-to-date context, this file should be very flexible 
 - **Enhanced RAG-Only Strategy**: 全質問をバックグラウンドRAG処理に統一
   - シンプル確認メッセージ："📚 過去のチャット履歴を確認して回答します。少々お待ちください..."
   - 複雑な即時回答ロジック削除による安定性向上
-- **High-Performance AI Model**: llama-3.1-8b-instruct (max_tokens: 400)
+- **Ultra High-Performance AI Model**: llama-4-scout-17b-16e-instruct (max_tokens: 400, temperature: 0.2)
   - 従来のllama-3.2-3b-instructから大幅アップグレード
   - より詳細で高品質な回答生成能力
 - **Enhanced RAG Processing**: 5件検索・メタデータ活用

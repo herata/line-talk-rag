@@ -1,5 +1,3 @@
-import { CloudflareWorkersAIEmbeddings } from "@langchain/cloudflare";
-import { CloudflareVectorizeStore } from "@langchain/cloudflare";
 import { messagingApi, validateSignature } from "@line/bot-sdk";
 import type { Context } from "hono";
 import { processMessageInBackground } from "./background-processor";
@@ -53,7 +51,7 @@ export async function handleWebhook(
 					if (event.source?.type === "group") {
 						return {
 							id: event.source.groupId,
-							type: "Group", 
+							type: "Group",
 							sourceType: event.source.type,
 						};
 					}
@@ -94,7 +92,7 @@ export async function handleWebhook(
 								messages: [
 									{
 										type: "text",
-										text: "🚫🚫 このボットは現在、特定の許可されたトークルーム、ユーザのみ利用可能です 🚫🚫"
+										text: "🚫🚫 このボットは現在、特定の許可されたトークルーム、ユーザのみ利用可能です 🚫🚫",
 									},
 								],
 							});

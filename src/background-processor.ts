@@ -92,7 +92,7 @@ ${ragContext}
 
 		// Use enhanced LLM for background processing with optimized parameters
 		console.log("Calling background AI with enhanced model...");
-		const aiResponse = await AI.run("@cf/meta/llama-3.1-8b-instruct", {
+		const aiResponse = await AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
 			messages: [
 				{
 					role: "system",
