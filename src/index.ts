@@ -23,7 +23,7 @@ app.get("/", (c) => {
 		status: "production",
 		endpoints: ["/prepare", "/webhook"],
 		features: {
-			workersAI: "enabled (phi-2 high-speed)",
+			workersAI: "enabled (mistral-7b with detailed logging)",
 			ragPipeline: "available",
 			directLLM: "active"
 		}
@@ -118,13 +118,15 @@ app.post("/webhook", async (c) => {
 					// const context = results.map((doc) => doc.pageContent).join("\n\n");
 					// === End of RAG Implementation ===
 
-					// === Direct AI LLM Implementation (High-Speed) ===
+					// === Direct AI LLM Implementation (High-Speed & Reliable) ===
 					try {
+						console.log(`Processing message: "${userMessage}"`);
+						
 						// Set timeout for AI generation (reduced for faster models)
 						const AI_TIMEOUT = 5000;
 						
 						const aiPromise = c.env.AI.run(
-							"@cf/microsoft/phi-2",
+							"@cf/mistral/mistral-7b-instruct-v0.1",
 							{
 								messages: [
 									{
@@ -144,27 +146,41 @@ app.post("/webhook", async (c) => {
 							setTimeout(() => reject(new Error('AI generation timeout')), AI_TIMEOUT)
 						);
 
+						console.log("Sending request to AI...");
 						const aiResponse = await Promise.race([aiPromise, timeoutPromise]);
+						console.log("AI response received:", JSON.stringify(aiResponse, null, 2));
 
-						// Extract response text from AI response
+						// Extract response text from AI response with detailed logging
 						let responseText = "";
 						if (aiResponse && typeof aiResponse === 'object') {
 							const response = aiResponse as Record<string, unknown>;
+							console.log("AI response structure:", Object.keys(response));
+							
 							if (response.response && typeof response.response === 'string') {
 								responseText = response.response;
+								console.log("Using response.response:", responseText);
 							} else if (response.result && typeof response.result === 'string') {
 								responseText = response.result;
+								console.log("Using response.result:", responseText);
+							} else if (response.answer && typeof response.answer === 'string') {
+								responseText = response.answer;
+								console.log("Using response.answer:", responseText);
 							} else {
+								console.log("Unknown response structure, using fallback");
 								responseText = "I received your message but couldn't process it properly.";
 							}
 						} else {
+							console.log("Invalid AI response format:", typeof aiResponse);
 							responseText = "Sorry, I'm having trouble processing your request.";
 						}
 
 						// Validate response text
 						if (!responseText || responseText.trim().length === 0) {
+							console.log("Empty response from AI, using fallback");
 							responseText = "I'm processing your message but couldn't generate a proper response.";
 						}
+
+						console.log("Final response text:", responseText);
 
 						// Send reply to LINE with timeout
 						const replyPromise = client.replyMessage({
@@ -179,10 +195,13 @@ app.post("/webhook", async (c) => {
 							setTimeout(() => reject(new Error('LINE reply timeout')), 3000)
 						);
 
+						console.log("Sending reply to LINE...");
 						await Promise.race([replyPromise, replyTimeoutPromise]);
+						console.log("Reply sent successfully!");
 						
 					} catch (aiError) {
 						console.error("AI generation failed:", aiError);
+						console.error("Error details:", JSON.stringify(aiError, null, 2));
 						
 						// Simple error response instead of echo
 						try {
@@ -193,6 +212,7 @@ app.post("/webhook", async (c) => {
 									text: "Sorry, I'm experiencing technical difficulties. Please try again.",
 								}],
 							});
+							console.log("Error response sent");
 						} catch (replyError) {
 							console.error("Error reply also failed:", replyError);
 						}
