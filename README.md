@@ -45,16 +45,179 @@ npm install
 
 ### 2. Environment Setup
 
-```bash
-# Copy environment template
-cp .dev.vars.example .dev.vars
+#### LINE Bot認証情報の設定
 
-# Edit with your LINE Bot credentials
-# CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
-# CHANNEL_SECRET=your_line_channel_secret
+```bash
+# 環境変数テンプレートをコピー
+cp .dev.vars.example .dev.vars
 ```
 
-### 3. Development
+`.dev.vars`ファイルを編集してLINE Bot認証情報を設定：
+
+```bash
+# LINE Bot Configuration
+LINE_CHANNEL_SECRET=your_line_channel_secret_here
+LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token_here
+
+# Development Notes:
+# 1. Get LINE_CHANNEL_SECRET from LINE Developers Console > Your Bot > Channel Secret
+# 2. Get LINE_CHANNEL_ACCESS_TOKEN from LINE Developers Console > Your Bot > Channel Access Token
+# 3. Copy this file to .dev.vars for local development
+# 4. Use `wrangler secret` command to set production secrets
+```
+
+**認証情報の取得手順：**
+1. [LINE Developers Console](https://developers.line.biz/console/)にアクセス
+2. あなたのBotを選択 → **Channel Secret**をコピー
+3. **Channel Access Token**を生成・コピー
+4. `.dev.vars`ファイルに貼り付け
+
+### 3. Access Control Configuration (Optional)
+
+特定のトークルームでのみBotの利用を制限したい場合は、環境変数を設定します：
+
+```bash
+# .dev.vars に追加
+ALLOWED_TALK_ROOMS=user_id_1,group_id_1,room_id_1
+
+# または wrangler.jsonc の vars セクションに追加
+{
+  "vars": {
+    "ALLOWED_TALK_ROOMS": "user_id_1,group_id_1,room_id_1"
+  }
+}
+```
+
+#### アクセス制御の動作
+- **友達追加**: 誰でも友達追加可能
+- **メッセージ利用**: `ALLOWED_TALK_ROOMS` で指定されたトークルームのみ
+- **未設定時**: 全てのトークルームで利用可能
+
+## 📋 LINE ID取得ガイド
+
+### 取得できるID種類
+
+| ID種類 | 説明 | 使用場面 |
+|--------|------|----------|
+| User ID | 1対1チャットのユーザID | 個人ユーザーのみアクセス許可 |
+| Group ID | グループチャットのID | 特定グループのみアクセス許可 |
+| Room ID | 複数人チャット（3-500人）のID | 特定ルームのみアクセス許可 |
+
+### ID取得方法
+
+#### 方法1: 専用コマンド（最も簡単）
+
+LINEボットに以下のいずれかのメッセージを送信：
+
+```
+/id
+/info
+id確認
+```
+
+**レスポンス例:**
+
+**個人チャットの場合:**
+```
+📋 トークルーム情報
+Source Type: user
+User ID: U1234567890abcdef1234567890abcdef
+
+💡 アクセス制御用ID: U1234567890abcdef1234567890abcdef
+
+※ この情報はアクセス制御設定で使用できます。
+```
+
+**グループチャットの場合:**
+```
+📋 トークルーム情報
+Source Type: group
+Group ID: C1234567890abcdef1234567890abcdef
+Your User ID: U1234567890abcdef1234567890abcdef
+
+💡 アクセス制御用ID: C1234567890abcdef1234567890abcdef
+
+※ この情報はアクセス制御設定で使用できます。
+```
+
+**⚠️ 重要な注意事項:**
+- **個人チャット**: `User ID` がアクセス制御用IDになります
+- **グループチャット**: `Group ID` がアクセス制御用IDになります（Your User IDではありません）
+- **複数人チャット**: `Room ID` がアクセス制御用IDになります
+
+#### 方法2: サーバーログ確認
+
+**ローカル開発時**
+```bash
+# 開発サーバー起動
+npm run dev
+
+# LINEでメッセージ送信後、ログを確認
+# 出力例: Message received - Type: group, ID: C1234567890abcdef1234567890abcdef, Message: "こんにちは"
+```
+
+**本番環境**
+```bash
+# リアルタイムログ確認
+wrangler tail
+
+# 特定時間のログ確認
+wrangler tail --since 1h
+```
+
+#### 方法3: 制限時の案内メッセージ
+
+アクセス制限が有効な状態で、制限されたトークルームからメッセージを送ると、IDが案内メッセージに含まれます。
+
+**レスポンス例:**
+```
+申し訳ございません。このボットは現在、特定の許可されたトークルームでのみご利用いただけます。🚫
+
+ご利用希望の場合は、管理者にお問い合わせください。
+
+📋 参考情報:
+Source Type: group
+Source ID: C1234567890abcdef1234567890abcdef
+```
+
+### ID設定方法
+
+#### ローカル開発（.dev.vars）
+```bash
+ALLOWED_TALK_ROOMS=U1234567890abcdef1234567890abcdef,C1234567890abcdef1234567890abcdef
+```
+
+#### 本番環境
+
+**方法1: wrangler.jsonc**
+```json
+{
+  "vars": {
+    "ALLOWED_TALK_ROOMS": "U1234567890abcdef1234567890abcdef,C1234567890abcdef1234567890abcdef"
+  }
+}
+```
+
+**方法2: wrangler secret コマンド**
+```bash
+wrangler secret put ALLOWED_TALK_ROOMS
+# プロンプトでIDリストを入力
+```
+
+### セキュリティ注意事項
+
+- **IDは機密情報**: ログファイルやコードに直接含めないよう注意
+- **最小権限の原則**: 必要最小限のトークルームのみ許可
+- **定期的な見直し**: 不要になったIDは設定から削除
+
+### テスト方法
+
+1. IDを設定
+2. 許可されたトークルームでメッセージ送信 → 正常動作
+3. 許可されていないトークルームでメッセージ送信 → 制限メッセージ表示
+4. `/id`コマンドでID確認 → 設定値と一致確認
+
+### 4. Development
 
 ```bash
 # Start development server
@@ -67,7 +230,7 @@ npm run cf-typegen
 npm run fix
 ```
 
-### 4. Deployment
+### 5. Deployment
 
 ```bash
 # Deploy to Cloudflare Workers

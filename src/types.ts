@@ -5,6 +5,7 @@ export type CloudflareBindings = {
 	VECTORIZE: VectorizeIndex;
 	LINE_CHANNEL_SECRET: string;
 	LINE_CHANNEL_ACCESS_TOKEN: string;
+	ALLOWED_TALK_ROOMS?: string; // カンマ区切りで許可されたトークルームID (userId, groupId, roomId)
 };
 
 export interface ParsedMessage {

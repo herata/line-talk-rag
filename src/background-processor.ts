@@ -9,7 +9,7 @@ import type { messagingApi } from "@line/bot-sdk";
 export async function processMessageInBackground(
 	AI: Ai,
 	client: messagingApi.MessagingApiClient,
-	userId: string,
+	targetId: string,
 	userMessage: string,
 	vectorizeIndex?: VectorizeIndex,
 ): Promise<void> {
@@ -105,7 +105,7 @@ ${ragContext}
 
 			// Send follow-up message using Push API
 			await client.pushMessage({
-				to: userId,
+				to: targetId,
 				messages: [
 					{
 						type: "text",
