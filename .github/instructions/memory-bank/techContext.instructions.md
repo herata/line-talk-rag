@@ -70,9 +70,12 @@ line-talk-rag/
 
 ## Technical Constraints & Optimizations
 - **Cloudflare Workers runtime environment**: ✅ Optimized for deployment constraints
-- **Workers AI model optimization**: ✅ Mistral-7B model for faster response times
-- **Execution time limits**: ✅ 8-second AI timeout + 3-second LINE reply timeout implemented
+- **Workers AI model optimization**: ✅ Dual-model balanced strategy
+  - Stage 1: qwen1.5-0.5b-chat (ultra-fast 4s response)
+  - Stage 3: llama-3.2-3b-instruct (balanced quality/speed)
+- **Execution time limits**: ✅ Sequential AI Processing implemented
 - **Response size optimization**: ✅ max_tokens 150 for efficient responses
+- **Japanese language optimization**: ✅ Complete localization
 - **Vectorize namespaces and index制限**: Ready for implementation
 - **LINE Messaging API制約**: Fully compliant with rate limits and requirements
 
@@ -84,6 +87,8 @@ line-talk-rag/
 ## Performance Requirements & Achievements
 - **Workers Edge network**: ✅ Low latency deployment ready
 - **Vectorize similarity search**: ✅ Optimized implementation ready for activation
-- **LLM prompt efficiency**: ✅ Optimized with Mistral-7B model and timeout handling
+- **LLM prompt efficiency**: ✅ Optimized with dual-model balanced strategy
+- **Sequential AI Processing**: ✅ Complete implementation with Japanese optimization
 - **Production constraints**: ✅ All Workers deployment limitations addressed
 - **Response time optimization**: ✅ Sub-10 second total response time achieved
+- **Japanese language support**: ✅ Native Japanese optimization complete

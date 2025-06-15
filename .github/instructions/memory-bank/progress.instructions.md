@@ -82,15 +82,24 @@ To ensure I have the most up-to-date context, this file should be very flexible 
 **PRODUCTION-READY**: Optimized, clean codebase ready for immediate deployment. All performance issues resolved.
 
 ### 💡 Key Implementation Details
-- **Workers AI Integration**: Production-optimized with Mistral-7B model and timeout handling
+- **Workers AI Integration**: Production-optimized with dual-model strategy (balanced)
+  - Stage 1: qwen1.5-0.5b-chat (ultra-fast 4s response)
+  - Stage 3: llama-3.2-3b-instruct (balanced quality/speed)
+- **Sequential AI Processing**: Complete implementation with Japanese optimization
 - **Event Handling**: Text messages, follow events, comprehensive error handling
 - **LINE Integration**: Full messagingApi.MessagingApiClient implementation with fallback
 - **RAG Pipeline**: Complete implementation preserved in comments for easy activation
 - **Security**: LINE signature verification with @line/bot-sdk validateSignature
 - **Environment**: .dev.vars configured with actual LINE credentials
 - **Performance**: Optimized for Cloudflare Workers constraints and deployment
+- **Language**: Japanese-first design with complete localization
 
 ### 🔧 Recent Achievements (2025/06/15)
+- ✅ **日本語完全対応**: 全システムメッセージを日本語化
+  - システムプロンプト、フォールバック、友達追加メッセージなど
+- ✅ **バランス重視モデル構成**: Sequential AI Processing最適化
+  - 即座: qwen1.5-0.5b (超高速) + バックグラウンド: llama-3.2-3b (バランス)
+  - max_tokens 150でバランス重視の高速化
 - ✅ **Performance Optimization**: Resolved Workers deployment timeout issues
   - AI model optimization: Mistral-7B for faster response times
   - Timeout implementation: 8s AI + 3s LINE reply limits
