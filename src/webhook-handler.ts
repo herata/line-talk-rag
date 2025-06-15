@@ -85,14 +85,18 @@ export async function handleWebhook(
 							`Source details - Type: ${sourceInfo.sourceType}, ID: ${sourceInfo.id}`,
 						);
 
-						// アクセス制限の案内メッセージを送信
+						// アクセス制限の案内メッセージを送信（Source ID情報を含む）
+						const restrictionMessage = `😥 このボットは許可されたトークルーム、およびユーザのみ利用可能です
+Source Type: ${sourceInfo.sourceType}
+Source ID: ${sourceInfo.id}`;
+
 						try {
 							await client.replyMessage({
 								replyToken: event.replyToken,
 								messages: [
 									{
 										type: "text",
-										text: "🚫🚫 このボットは現在、特定の許可されたトークルーム、ユーザのみ利用可能です 🚫🚫",
+										text: restrictionMessage,
 									},
 								],
 							});
