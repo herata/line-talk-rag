@@ -132,133 +132,41 @@ export async function handleWebhook(
 					continue;
 					}
 
-					// === Immediate Response Strategy for Cloudflare Workers ===
-					// Send immediate acknowledgment and process AI in background
-					console.log(`Processing message: "${userMessage}"`);
+					// === RAG-Only Strategy: All responses processed in background ===
+					console.log(`Processing message for RAG response: "${userMessage}"`);
 
-					// Strategy 1: Fast AI call with aggressive timeout and RAG support
+					// Send immediate acknowledgment and process with full RAG in background
 					try {
-						// Ultra-fast timeout optimized for Cloudflare Workers
-						const AI_TIMEOUT = 4000; // 4 seconds max
+						const acknowledgmentMessages = [
+							"📚 過去のチャット履歴を確認して回答します！少々お待ちください... 🔍",
+							"🤖 関連情報を検索中です。詳細な回答をお送りします... ⚡",
+							"💭 チャット履歴から関連情報を探して、適切な回答を作成中です... 📖",
+							"🧠 過去の会話を参照して、より良い回答を準備しています... 🚀",
+							"📝 履歴検索中です。RAG機能で詳細に回答します... ✨",
+						];
 
-						console.log("Sending request to AI...");
-						const startTime = Date.now();
+						const randomMessage = acknowledgmentMessages[
+							Math.floor(Math.random() * acknowledgmentMessages.length)
+						];
 
-						// Try to use RAG for immediate response if available
-						let contextualPrompt = userMessage;
-						let ragContext = "";
-
-						if (c.env.VECTORIZE) {
-							try {
-								console.log("Attempting fast RAG search...");
-
-								// Initialize embeddings for the user query
-								const embeddings = new CloudflareWorkersAIEmbeddings({
-									binding: c.env.AI,
-									modelName: "@cf/baai/bge-m3",
-								});
-
-								// Initialize vector store for similarity search
-								const vectorStore = new CloudflareVectorizeStore(embeddings, {
-									index: c.env.VECTORIZE,
-								});
-
-								// Quick search for relevant documents (reduced count for speed)
-								const results = await vectorStore.similaritySearch(userMessage, 2);
-
-								if (results.length > 0) {
-									console.log(`Found ${results.length} relevant documents for fast response`);
-
-									// Prepare context from search results (shorter for fast response)
-									ragContext = results
-										.map((doc, index) => {
-											return `[関連情報 ${index + 1}]\n${doc.pageContent.substring(0, 200)}...`;
-										})
-										.join("\n\n");
-
-									// Create enhanced prompt with context for fast response
-									contextualPrompt = `過去の会話から関連情報を参考にして回答してください。
-
-関連情報:
-${ragContext}
-
-質問: ${userMessage}
-
-簡潔で的確な回答をお願いします。`;
-								}
-							} catch (ragError) {
-								console.error("Fast RAG search failed:", ragError);
-								// Continue with general response if RAG fails
-							}
-						}
-
-						const aiPromise = c.env.AI.run("@cf/qwen/qwen1.5-0.5b-chat", {
-							messages: [
-								{
-									role: "system",
-									content: ragContext
-										? "あなたは親切なAIアシスタントです。提供された関連情報を参考にして、簡潔で直接的な日本語の回答をしてください。"
-										: "あなたは親切なAIアシスタントです。簡潔で直接的な日本語の回答をしてください。",
-								},
-								{
-									role: "user",
-									content: contextualPrompt,
-								},
-							],
-							max_tokens: 50, // Reduced for speed
-							temperature: 0.1, // More deterministic = faster
-							stream: false,
-						});
-
-						const timeoutPromise = new Promise((_, reject) =>
-							setTimeout(() => reject(new Error("AI timeout")), AI_TIMEOUT),
-						);
-
-						const aiResponse = await Promise.race([aiPromise, timeoutPromise]);
-						const processingTime = Date.now() - startTime;
-						console.log(`AI response received in ${processingTime}ms`);
-
-						// Extract response text quickly
-						let responseText = "";
-						if (aiResponse && typeof aiResponse === "object") {
-							const response = aiResponse as Record<string, unknown>;
-							responseText =
-								(response.response as string) ||
-								(response.result as string) ||
-								(response.answer as string) ||
-								"";
-						}
-
-						if (!responseText.trim()) {
-							responseText = "メッセージを考えています...";
-						}
-
-						// Add RAG indicator if context was used
-						const finalResponse = ragContext 
-							? `📖 ${responseText}`
-							: responseText;
-
-						console.log("Sending reply to LINE...");
 						await client.replyMessage({
 							replyToken: replyToken,
 							messages: [
 								{
 									type: "text",
-									text: finalResponse,
+									text: randomMessage,
 								},
 							],
 						});
-						console.log("Reply sent successfully!");
+						console.log("RAG acknowledgment sent");
 
-						// Always start background processing for enhanced RAG response
-						// This provides a more detailed follow-up even if immediate response succeeded
 						// 送信先IDを適切に決定
 						const targetId = event.source?.type === "group" ? event.source.groupId
 							: event.source?.type === "room" ? event.source.roomId
 							: event.source?.userId;
 							
 						if (targetId) {
-							console.log(`Starting background AI processing for enhanced response to ${event.source?.type}: ${targetId}`);
+							console.log(`Starting full RAG processing to ${event.source?.type}: ${targetId}`);
 							c.executionCtx.waitUntil(
 								processMessageInBackground(
 									c.env.AI,
@@ -269,56 +177,39 @@ ${ragContext}
 								),
 							);
 						}
-					} catch (fastAiError) {
-						console.error("Fast AI failed:", fastAiError);
-
-						// Strategy 2: Immediate fallback response + background processing
+					} catch (error) {
+						console.error("RAG acknowledgment failed:", error);
+						
+						// Last resort fallback
 						try {
-							const fallbackMessages = [
-								"メッセージを処理中です。少々お待ちください！ 🤔",
-								"考えています...少しお時間をください！ 💭",
-								"AIがメッセージを処理しています... ⚡",
-								"回答を作成中です！ 🔄",
-								"メッセージを受信して、考えています！ 🧠",
-							];
-
-							const randomMessage =
-								fallbackMessages[
-									Math.floor(Math.random() * fallbackMessages.length)
-								];
-
 							await client.replyMessage({
 								replyToken: replyToken,
 								messages: [
 									{
 										type: "text",
-										text: randomMessage,
+										text: "メッセージを受信しました。処理中です... 🤖",
 									},
 								],
 							});
-							console.log("Fallback response sent");
-
-							// Background processing for better AI response (no await)
-							// This will run after the webhook response is sent
-							// 送信先IDを適切に決定
+							
+							// Still attempt background processing
 							const targetId = event.source?.type === "group" ? event.source.groupId
 								: event.source?.type === "room" ? event.source.roomId
 								: event.source?.userId;
 								
 							if (targetId) {
-								console.log(`Starting background AI processing to ${event.source?.type}: ${targetId}`);
 								c.executionCtx.waitUntil(
 									processMessageInBackground(
 										c.env.AI,
 										client,
 										targetId,
 										userMessage,
-										c.env.VECTORIZE, // Pass Vectorize index for RAG support
+										c.env.VECTORIZE,
 									),
 								);
 							}
 						} catch (fallbackError) {
-							console.error("Fallback response also failed:", fallbackError);
+							console.error("Final fallback also failed:", fallbackError);
 						}
 					}
 				} else if (event.type === "follow") {

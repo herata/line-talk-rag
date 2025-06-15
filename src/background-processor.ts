@@ -35,30 +35,47 @@ export async function processMessageInBackground(
 					index: vectorizeIndex,
 				});
 
-				// Search for relevant documents from stored chat history
-				const results = await vectorStore.similaritySearch(userMessage, 3);
+				// Search for relevant documents from stored chat history (increased count for better context)
+				const results = await vectorStore.similaritySearch(userMessage, 5);
 
 				if (results.length > 0) {
 					console.log(`Found ${results.length} relevant documents`);
 
-					// Prepare context from search results
+					// Prepare comprehensive context from search results
 					ragContext = results
 						.map((doc, index) => {
-							return `[関連情報 ${index + 1}]\n${doc.pageContent}`;
+							// Include more metadata for better context
+							const metadata = doc.metadata || {};
+							const timestamp = metadata.timestamp ? ` [${metadata.timestamp}]` : "";
+							const participant = metadata.participant ? ` (${metadata.participant})` : "";
+							
+							return `[関連情報 ${index + 1}]${timestamp}${participant}\n${doc.pageContent}`;
 						})
 						.join("\n\n");
 
-					// Create enhanced prompt with context
-					contextualPrompt = `LINE チャット履歴から関連する情報が見つかりました。この情報を参考にして回答してください。
+					// Create detailed prompt with comprehensive context
+					contextualPrompt = `あなたは過去のLINEチャット履歴を参照できるAIアシスタントです。以下の関連する過去の会話内容を詳しく分析して、現在の質問に対する最適な回答を提供してください。
 
-関連する過去の会話:
+【過去の関連会話】:
 ${ragContext}
 
-現在の質問: ${userMessage}
+【現在の質問】: ${userMessage}
 
-上記の関連情報を踏まえて、適切で詳細な回答を提供してください。関連情報がない場合は、一般的な知識で回答してください。`;
+【回答指針】:
+1. 過去の会話内容から関連する情報を積極的に活用してください
+2. 文脈や背景を理解して、より詳細で的確な回答を心がけてください
+3. 過去の会話で言及された内容があれば、それを踏まえて回答してください
+4. 関連情報がない場合は、一般的な知識で丁寧に回答してください
+5. 日本語で自然で読みやすい回答を提供してください
+
+回答をお願いします:`;
 				} else {
 					console.log("No relevant documents found, using general response");
+					contextualPrompt = `以下の質問に対して、丁寧で詳細な日本語回答を提供してください。
+
+質問: ${userMessage}
+
+親切で知識豊富なAIアシスタントとして、適切で有用な回答をお願いします。`;
 				}
 			} catch (ragError) {
 				console.error(
@@ -69,51 +86,107 @@ ${ragContext}
 			}
 		}
 
-		// Use enhanced LLM for background processing
+		// Use enhanced LLM for background processing with optimized parameters
+		console.log("Calling background AI with enhanced model...");
 		const aiResponse = await AI.run("@cf/meta/llama-3.2-3b-instruct", {
 			messages: [
 				{
 					role: "system",
 					content: vectorizeIndex
-						? "あなたは親切で知識豊富なAIアシスタントです。提供されたLINEチャット履歴の文脈を理解し、過去の会話内容を参考にしながら、日本語で丁寧で詳細な回答を提供してください。関連する過去の情報がある場合は、それを活用して回答の質を高めてください。"
-						: "あなたは親切で知識豊富なAIアシスタントです。日本語で丁寧で詳細な回答を提供してください。",
+						? "あなたは過去のLINEチャット履歴を参照できる親切で知識豊富なAIアシスタントです。提供された過去の会話内容を詳しく分析し、文脈を理解して、現在の質問に対する最適で詳細な日本語回答を提供してください。過去の情報がある場合は積極的に活用し、関連性を明確にして回答の質を高めてください。"
+						: "あなたは親切で知識豊富なAIアシスタントです。質問者の意図を理解し、丁寧で詳細かつ有用な日本語回答を提供してください。",
 				},
 				{
 					role: "user",
 					content: contextualPrompt,
 				},
 			],
-			max_tokens: 200, // RAGの場合はより詳細な回答を許可
-			temperature: 0.3,
+			max_tokens: 300, // Increased for more detailed responses
+			temperature: 0.2, // Balanced creativity and consistency
+			stream: false,
 		});
 
+		console.log("Background AI response received:", JSON.stringify(aiResponse, null, 2));
+
 		let responseText = "";
-		if (aiResponse && typeof aiResponse === "object") {
-			const response = aiResponse as Record<string, unknown>;
-			responseText =
-				(response.response as string) ||
-				(response.result as string) ||
-				(response.answer as string) ||
-				"";
+		
+		try {
+			if (aiResponse && typeof aiResponse === "object") {
+				const response = aiResponse as Record<string, unknown>;
+				console.log("Background response keys:", Object.keys(response));
+				
+				// Comprehensive response extraction
+				if (response.response && typeof response.response === "string") {
+					responseText = response.response.trim();
+					console.log("Background: Found response in 'response' field");
+				} else if (response.result && typeof response.result === "string") {
+					responseText = response.result.trim();
+					console.log("Background: Found response in 'result' field");
+				} else if (response.answer && typeof response.answer === "string") {
+					responseText = response.answer.trim();
+					console.log("Background: Found response in 'answer' field");
+				} else if (response.text && typeof response.text === "string") {
+					responseText = response.text.trim();
+					console.log("Background: Found response in 'text' field");
+				} else {
+					// Check nested structures
+					const nestedResponse = response.result || response.response;
+					if (nestedResponse && typeof nestedResponse === "object") {
+						const nested = nestedResponse as Record<string, unknown>;
+						console.log("Background: Nested object keys:", Object.keys(nested));
+						
+						if (nested.response && typeof nested.response === "string") {
+							responseText = nested.response.trim();
+							console.log("Background: Found response in nested 'response' field");
+						} else if (nested.text && typeof nested.text === "string") {
+							responseText = nested.text.trim();
+							console.log("Background: Found response in nested 'text' field");
+						} else if (nested.content && typeof nested.content === "string") {
+							responseText = nested.content.trim();
+							console.log("Background: Found response in nested 'content' field");
+						}
+					}
+				}
+			}
+		} catch (extractError) {
+			console.error("Background: Error extracting response text:", extractError);
 		}
 
-		if (responseText.trim()) {
-			// Prepare enhanced response message
-			const messagePrefix = ragContext
-				? "📚 過去の会話を参考にした詳細回答:"
-				: "💡 より詳しい回答です:";
+		console.log(`Background: Final extracted response text: "${responseText}"`);
+		console.log(`Background: Response text length: ${responseText.length}`);
 
-			// Send follow-up message using Push API
+		if (responseText.trim()) {
+			// Enhanced response message with RAG context indicator
+			let messagePrefix = "";
+			if (ragContext) {
+				messagePrefix = "📚 過去のチャット履歴を参考にした詳細回答:\n\n";
+			} else {
+				messagePrefix = "🤖 AI回答:\n\n";
+			}
+
+			// Send detailed follow-up message using Push API
 			await client.pushMessage({
 				to: targetId,
 				messages: [
 					{
 						type: "text",
-						text: `${messagePrefix} ${responseText}`,
+						text: `${messagePrefix}${responseText}`,
 					},
 				],
 			});
-			console.log("Enhanced AI response sent successfully");
+			console.log("Enhanced RAG response sent successfully");
+		} else {
+			console.error("Background processing produced no response text");
+			// Send fallback message
+			await client.pushMessage({
+				to: targetId,
+				messages: [
+					{
+						type: "text",
+						text: "申し訳ございません。回答の生成に失敗しました。もう一度お試しください。🙏",
+					},
+				],
+			});
 		}
 	} catch (error) {
 		console.error("Background processing failed:", error);
