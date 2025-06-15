@@ -15,17 +15,71 @@ type CloudflareBindings = {
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
+// Background processing function for better AI responses
+async function processMessageInBackground(
+	AI: Ai, 
+	client: messagingApi.MessagingApiClient, 
+	userId: string, 
+	userMessage: string
+): Promise<void> {
+	try {
+		console.log("Background processing started for:", userMessage);
+		
+		// Use longer timeout for background processing
+		const aiResponse = await AI.run(
+			"@cf/qwen/qwen1.5-0.5b-chat",
+			{
+				messages: [
+					{
+						role: "system",
+						content: "You are a helpful AI assistant. Provide thoughtful and detailed responses."
+					},
+					{
+						role: "user",
+						content: userMessage
+					}
+				],
+				max_tokens: 150,
+				temperature: 0.3
+			}
+		);
+
+		let responseText = "";
+		if (aiResponse && typeof aiResponse === 'object') {
+			const response = aiResponse as Record<string, unknown>;
+			responseText = (response.response as string) || (response.result as string) || (response.answer as string) || "";
+		}
+
+		if (responseText.trim()) {
+			// Send follow-up message using Push API
+			await client.pushMessage({
+				to: userId,
+				messages: [{
+					type: "text",
+					text: `💡 Here's a more detailed response: ${responseText}`,
+				}],
+			});
+			console.log("Background AI response sent successfully");
+		}
+		
+	} catch (error) {
+		console.error("Background processing failed:", error);
+		// Don't send error message to user - they already got a fallback response
+	}
+}
+
 // Health check endpoint
 app.get("/", (c) => {
 	return c.json({
 		message: "LINE Talk RAG System",
-		version: "1.0.2",
+		version: "1.0.3",
 		status: "production",
 		endpoints: ["/prepare", "/webhook"],
 		features: {
-			workersAI: "enabled (mistral-7b with detailed logging)",
-			ragPipeline: "available",
-			directLLM: "active"
+			workersAI: "enabled (ultra-fast qwen1.5-0.5b with 4s timeout)",
+			strategy: "immediate response with fallback",
+			backgroundProcessing: "enabled with Push API",
+			optimizations: "aggressive timeout, reduced tokens, deterministic"
 		}
 	});
 });
@@ -105,119 +159,106 @@ app.post("/webhook", async (c) => {
 			try {
 				if (event.type === "message" && event.message.type === "text") {
 					const userMessage = event.message.text;
+					const replyToken = event.replyToken;
 
-					// === RAG Implementation (Commented for testing) ===
-					// const embeddings = new CloudflareWorkersAIEmbeddings({
-					// binding: c.env.AI,
-					// modelName: "@cf/baai/bge-m3",
-					// });
-					// const vectorStore = new CloudflareVectorizeStore(embeddings, {
-					// index: c.env.VECTORIZE,
-					// });
-					// const results = await vectorStore.similaritySearch(userMessage, 3);
-					// const context = results.map((doc) => doc.pageContent).join("\n\n");
-					// === End of RAG Implementation ===
-
-					// === Direct AI LLM Implementation (High-Speed & Reliable) ===
+					// === Immediate Response Strategy for Cloudflare Workers ===
+					// Send immediate acknowledgment and process AI in background
+					
+					console.log(`Processing message: "${userMessage}"`);
+					
+					// Strategy 1: Fast AI call with aggressive timeout
 					try {
-						console.log(`Processing message: "${userMessage}"`);
+						// Ultra-fast timeout optimized for Cloudflare Workers
+						const AI_TIMEOUT = 4000; // 4 seconds max
 						
-						// Set timeout for AI generation (reduced for faster models)
-						const AI_TIMEOUT = 5000;
+						console.log("Sending request to AI...");
+						const startTime = Date.now();
 						
 						const aiPromise = c.env.AI.run(
-							"@cf/mistral/mistral-7b-instruct-v0.1",
+							"@cf/qwen/qwen1.5-0.5b-chat",
 							{
 								messages: [
 									{
 										role: "system",
-										content: "You are a helpful AI assistant. Keep responses brief and engaging."
+										content: "You are a helpful AI assistant. Give brief, direct answers only."
 									},
 									{
 										role: "user",
 										content: userMessage
 									}
 								],
-								max_tokens: 100
+								max_tokens: 50, // Reduced for speed
+								temperature: 0.1, // More deterministic = faster
+								stream: false
 							}
 						);
 
 						const timeoutPromise = new Promise((_, reject) => 
-							setTimeout(() => reject(new Error('AI generation timeout')), AI_TIMEOUT)
+							setTimeout(() => reject(new Error('AI timeout')), AI_TIMEOUT)
 						);
 
-						console.log("Sending request to AI...");
 						const aiResponse = await Promise.race([aiPromise, timeoutPromise]);
-						console.log("AI response received:", JSON.stringify(aiResponse, null, 2));
+						const processingTime = Date.now() - startTime;
+						console.log(`AI response received in ${processingTime}ms`);
 
-						// Extract response text from AI response with detailed logging
+						// Extract response text quickly
 						let responseText = "";
 						if (aiResponse && typeof aiResponse === 'object') {
 							const response = aiResponse as Record<string, unknown>;
-							console.log("AI response structure:", Object.keys(response));
-							
-							if (response.response && typeof response.response === 'string') {
-								responseText = response.response;
-								console.log("Using response.response:", responseText);
-							} else if (response.result && typeof response.result === 'string') {
-								responseText = response.result;
-								console.log("Using response.result:", responseText);
-							} else if (response.answer && typeof response.answer === 'string') {
-								responseText = response.answer;
-								console.log("Using response.answer:", responseText);
-							} else {
-								console.log("Unknown response structure, using fallback");
-								responseText = "I received your message but couldn't process it properly.";
-							}
-						} else {
-							console.log("Invalid AI response format:", typeof aiResponse);
-							responseText = "Sorry, I'm having trouble processing your request.";
+							responseText = (response.response as string) || (response.result as string) || (response.answer as string) || "";
 						}
 
-						// Validate response text
-						if (!responseText || responseText.trim().length === 0) {
-							console.log("Empty response from AI, using fallback");
-							responseText = "I'm processing your message but couldn't generate a proper response.";
+						if (!responseText.trim()) {
+							responseText = "I'm thinking about your message...";
 						}
 
-						console.log("Final response text:", responseText);
-
-						// Send reply to LINE with timeout
-						const replyPromise = client.replyMessage({
-							replyToken: event.replyToken,
+						console.log("Sending reply to LINE...");
+						await client.replyMessage({
+							replyToken: replyToken,
 							messages: [{
 								type: "text",
 								text: responseText,
 							}],
 						});
-
-						const replyTimeoutPromise = new Promise((_, reject) => 
-							setTimeout(() => reject(new Error('LINE reply timeout')), 3000)
-						);
-
-						console.log("Sending reply to LINE...");
-						await Promise.race([replyPromise, replyTimeoutPromise]);
 						console.log("Reply sent successfully!");
 						
-					} catch (aiError) {
-						console.error("AI generation failed:", aiError);
-						console.error("Error details:", JSON.stringify(aiError, null, 2));
+					} catch (fastAiError) {
+						console.error("Fast AI failed:", fastAiError);
 						
-						// Simple error response instead of echo
+						// Strategy 2: Immediate fallback response + background processing
 						try {
+							const fallbackMessages = [
+								"I'm processing your message and will respond shortly! 🤔",
+								"Thinking about that... give me a moment! 💭",
+								"Your message is being processed by AI... ⚡",
+								"Working on a response for you! 🔄",
+								"I received your message and I'm thinking about it! 🧠"
+							];
+							
+							const randomMessage = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+							
 							await client.replyMessage({
-								replyToken: event.replyToken,
+								replyToken: replyToken,
 								messages: [{
 									type: "text",
-									text: "Sorry, I'm experiencing technical difficulties. Please try again.",
+									text: randomMessage,
 								}],
 							});
-							console.log("Error response sent");
-						} catch (replyError) {
-							console.error("Error reply also failed:", replyError);
+							console.log("Fallback response sent");
+							
+							// Background processing for better AI response (no await)
+							// This will run after the webhook response is sent
+							if (event.source?.userId) {
+								console.log("Starting background AI processing...");
+								c.executionCtx.waitUntil(
+									processMessageInBackground(c.env.AI, client, event.source.userId, userMessage)
+								);
+							}
+							
+						} catch (fallbackError) {
+							console.error("Fallback response also failed:", fallbackError);
 						}
 					}
-					// === End of Direct AI LLM Implementation ===
 
 				} else if (event.type === "follow") {
 					// Handle follow event (user adds bot as friend)
