@@ -19,13 +19,13 @@ const app = new Hono<{ Bindings: CloudflareBindings }>();
 app.get("/", (c) => {
 	return c.json({
 		message: "LINE Talk RAG System",
-		version: "1.0.1",
+		version: "1.0.2",
 		status: "production",
 		endpoints: ["/prepare", "/webhook"],
 		features: {
-			workersAI: "enabled (mistral-7b)",
+			workersAI: "enabled (phi-2 high-speed)",
 			ragPipeline: "available",
-			echoBot: "fallback"
+			directLLM: "active"
 		}
 	});
 });
@@ -118,25 +118,25 @@ app.post("/webhook", async (c) => {
 					// const context = results.map((doc) => doc.pageContent).join("\n\n");
 					// === End of RAG Implementation ===
 
-					// === Workers AI LLM Implementation (Production Optimized) ===
+					// === Direct AI LLM Implementation (High-Speed) ===
 					try {
-						// Set timeout for AI generation (8 seconds for Workers limit)
-						const AI_TIMEOUT = 8000;
+						// Set timeout for AI generation (reduced for faster models)
+						const AI_TIMEOUT = 5000;
 						
 						const aiPromise = c.env.AI.run(
-							"@cf/mistral/mistral-7b-instruct-v0.1",
+							"@cf/microsoft/phi-2",
 							{
 								messages: [
 									{
 										role: "system",
-										content: "You are a helpful AI assistant. Keep responses brief and engaging (under 100 words)."
+										content: "You are a helpful AI assistant. Keep responses brief and engaging."
 									},
 									{
 										role: "user",
 										content: userMessage
 									}
 								],
-								max_tokens: 150
+								max_tokens: 100
 							}
 						);
 
@@ -182,24 +182,22 @@ app.post("/webhook", async (c) => {
 						await Promise.race([replyPromise, replyTimeoutPromise]);
 						
 					} catch (aiError) {
-						console.error("AI generation failed, falling back to echo:", aiError);
+						console.error("AI generation failed:", aiError);
 						
-						// Fallback to Echo Bot if AI fails
-						const echoMessage = `Echo: ${userMessage}`;
-						
+						// Simple error response instead of echo
 						try {
 							await client.replyMessage({
 								replyToken: event.replyToken,
 								messages: [{
 									type: "text",
-									text: echoMessage,
+									text: "Sorry, I'm experiencing technical difficulties. Please try again.",
 								}],
 							});
-						} catch (echoError) {
-							console.error("Echo fallback also failed:", echoError);
+						} catch (replyError) {
+							console.error("Error reply also failed:", replyError);
 						}
 					}
-					// === End of Workers AI LLM Implementation ===
+					// === End of Direct AI LLM Implementation ===
 
 				} else if (event.type === "follow") {
 					// Handle follow event (user adds bot as friend)
@@ -207,7 +205,7 @@ app.post("/webhook", async (c) => {
 						replyToken: event.replyToken,
 						messages: [{
 							type: "text",
-							text: "Thanks for adding me! I'm powered by Workers AI. 🤖",
+							text: "Thanks for adding me! I'm powered by Workers AI and ready to chat! 🤖💬",
 						}],
 					});
 				
