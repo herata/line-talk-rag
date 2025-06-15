@@ -34,12 +34,21 @@ To ensure I have the most up-to-date context, this file should be very flexible 
 ```
 line-talk-rag/
 ├── src/
-│   └── index.ts          # メインアプリケーション
-├── package.json          # 依存関係とスクリプト
-├── tsconfig.json         # TypeScript設定
-├── wrangler.jsonc        # Cloudflare Workers設定
-├── biome.json           # コード品質設定
-└── README.md            # プロジェクト文書
+│   ├── index.ts             # メインルーター (70行の軽量実装)
+│   ├── types.ts             # 型定義・インターフェース
+│   ├── parser.ts            # LINEチャット履歴解析エンジン
+│   ├── prepare-handler.ts   # ファイルアップロード処理
+│   ├── webhook-handler.ts   # LINEウェブフック処理
+│   ├── background-processor.ts # RAGバックグラウンド処理
+│   └── health-handler.ts    # ヘルスチェック
+├── package.json             # 依存関係とスクリプト
+├── tsconfig.json            # TypeScript設定
+├── wrangler.jsonc           # Cloudflare Workers設定
+├── biome.json              # コード品質設定
+├── sample_line_chat.txt    # サンプルチャットファイル
+├── test_file_upload.sh     # ファイルアップロードテスト
+├── upload-demo.html        # デモインターフェース
+└── README_PREPARE_ENDPOINT.md # API仕様書
 ```
 
 ## Configuration Details

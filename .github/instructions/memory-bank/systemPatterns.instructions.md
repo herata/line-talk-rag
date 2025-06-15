@@ -26,13 +26,14 @@ LINE Client → Webhook → Workers → AI/Vectorize → Response
 
 ### 1. Endpoint Pattern
 各エンドポイントは明確な責任分離：
-- `/prepare`: データ準備専用
+- `/prepare`: ファイルアップロード専用（.txtファイルのみ）
 - `/webhook`: リアルタイム対話専用
+- `/`: ヘルスチェック・システム情報
 
 ### 2. Processing Pipeline Pattern
-#### Prepare Pipeline:
+#### Prepare Pipeline (File Upload Only):
 ```
-Text Input → LangChain RecursiveCharacterTextSplitter → LangChain CloudflareWorkersAI Embedding → Vectorize Storage
+File Upload (.txt) → Content-Type Validation → File Type Check → LangChain RecursiveCharacterTextSplitter → LangChain CloudflareWorkersAI Embedding → Vectorize Storage
 ```
 
 #### Webhook Pipeline:
@@ -46,7 +47,17 @@ LINE Message → @line/bot-sdk Verification → LangChain Embedding → Vectoriz
 - LINE-friendly error messages
 - Retry logic for AI service calls
 
-### 4. Data Flow Pattern
+### 4. Modular Architecture Pattern
+- **Separation of Concerns**: 7つの専用モジュール
+  - `types.ts`: 型定義とインターフェース
+  - `parser.ts`: LINEチャット解析エンジン  
+  - `prepare-handler.ts`: ファイルアップロード処理
+  - `webhook-handler.ts`: LINEウェブフック処理
+  - `background-processor.ts`: RAGバックグラウンド処理
+  - `health-handler.ts`: ヘルスチェック
+  - `index.ts`: 軽量ルーター（70行）
+- **Maintainability**: モジュール間の明確な依存関係
+- **Testability**: 各モジュールの独立テスト可能
 #### Embedding Flow:
 1. LangChain RecursiveCharacterTextSplitterでテキストチャンク分割
 2. @langchain/cloudflareを使用してWorkers AI Embeddingモデルでベクトル化
@@ -60,16 +71,22 @@ LINE Message → @line/bot-sdk Verification → LangChain Embedding → Vectoriz
 
 ## Security Patterns
 
-### 1. Webhook Verification
+### 1. File Upload Security
+- **Content-Type Validation**: Strict multipart/form-data enforcement
+- **File Type Restriction**: .txt files only, prevents executable uploads
+- **Size Validation**: File size limits for resource protection
+- **JSON Elimination**: Removed JSON parsing to eliminate injection risks
+
+### 2. Webhook Verification
 - @line/bot-sdkによるLINE Channel Secret署名検証
 - Request body validation
 - LangChain Document構造での安全なデータ処理
 
-### 2. Data Isolation
+### 3. Data Isolation
 - User-specific Vectorize namespaces
 - Access control through bindings
 
-### 3. Environment Variables
+### 4. Environment Variables
 - API keys and secrets in .env/.dev.vars
 - wrangler.jsonc secrets configuration
 

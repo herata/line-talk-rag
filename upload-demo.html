@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE Talk RAG - ファイルアップロード</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #00B900;
+            padding-bottom: 10px;
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            margin: 20px 0;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #00B900;
+        }
+        .upload-area.drag-over {
+            border-color: #00B900;
+            background-color: #f0fff0;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        button {
+            background: #00B900;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #009900;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border-left: 4px solid #00B900;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .options {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .option-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: 500;
+        }
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100px;
+        }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 LINE Talk RAG - ファイルアップロード</h1>
+        
+        <p>LINEチャット履歴ファイル（.txt）をアップロードして、RAG用データとして処理します。</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📄 ファイルをドラッグ&ドロップ または クリックして選択</p>
+            <input type="file" id="fileInput" accept=".txt" style="display: none;">
+            <button onclick="document.getElementById('fileInput').click()">ファイルを選択</button>
+        </div>
+        
+        <div class="options">
+            <h3>⚙️ オプション設定</h3>
+            <div class="option-group">
+                <label>チャンクサイズ:</label>
+                <input type="number" id="chunkSize" value="1500" min="500" max="3000">
+                <small>（推奨: 1500）</small>
+            </div>
+            <div class="option-group">
+                <label>オーバーラップ:</label>
+                <input type="number" id="chunkOverlap" value="300" min="100" max="500">
+                <small>（推奨: 300）</small>
+            </div>
+        </div>
+        
+        <button id="uploadBtn" onclick="uploadFile()" disabled>🚀 アップロード</button>
+        <button onclick="testJson()">📝 JSONテスト</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const resultDiv = document.getElementById('result');
+        
+        let selectedFile = null;
+        
+        // ドラッグ&ドロップ処理
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        function handleFileSelect(file) {
+            if (!file.name.endsWith('.txt')) {
+                showResult('❌ エラー: テキストファイル (.txt) のみ対応しています。', true);
+                return;
+            }
+            
+            selectedFile = file;
+            uploadArea.innerHTML = `<p>✅ 選択されたファイル: ${file.name} (${(file.size/1024).toFixed(1)} KB)</p>`;
+            uploadBtn.disabled = false;
+        }
+        
+        async function uploadFile() {
+            if (!selectedFile) return;
+            
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '⏳ アップロード中...';
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            const options = {
+                chunkSize: parseInt(document.getElementById('chunkSize').value),
+                chunkOverlap: parseInt(document.getElementById('chunkOverlap').value)
+            };
+            formData.append('options', JSON.stringify(options));
+            
+            try {
+                const response = await fetch('/prepare', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(`✅ 処理完了！
+                    
+📊 処理結果:
+• 元メッセージ数: ${result.summary.originalMessages}
+• 会話チャンク数: ${result.summary.conversationChunks}
+• 最終ドキュメント数: ${result.summary.finalDocumentChunks}
+• 参加者: ${result.summary.participants.join(', ')}
+• 日付範囲: ${result.summary.dateRange.start} 〜 ${result.summary.dateRange.end}
+• Vectorize状態: ${result.processingInfo.vectorizeStatus}
+
+⚙️ 処理設定:
+• チャンクサイズ: ${result.processingInfo.chunkSize}
+• オーバーラップ: ${result.processingInfo.chunkOverlap}
+• 埋め込みモデル: ${result.processingInfo.embeddingModel}`, false);
+                } else {
+                    showResult(`❌ エラー: ${result.error}`, true);
+                }
+            } catch (error) {
+                showResult(`❌ ネットワークエラー: ${error.message}`, true);
+            }
+            
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '🚀 アップロード';
+        }
+        
+        async function testJson() {
+            const sampleText = `[LINE] 友達とのトーク履歴
+保存日時：2025/6/15 21:09
+
+2024/1/23(火)
+9:20\tユーザーA\tおは！
+9:20\tユーザーA\t今日もファシリテーターなんや！ファイト！
+12:53\tユーザーB\tありがと〜！行ってくる！`;
+            
+            try {
+                const response = await fetch('/prepare', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: sampleText })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(`✅ JSONテスト成功！
+                    
+📊 サンプル処理結果:
+• 元メッセージ数: ${result.summary.originalMessages}
+• 参加者: ${result.summary.participants.join(', ')}
+• Vectorize状態: ${result.processingInfo.vectorizeStatus}`, false);
+                } else {
+                    showResult(`❌ JSONテストエラー: ${result.error}`, true);
+                }
+            } catch (error) {
+                showResult(`❌ ネットワークエラー: ${error.message}`, true);
+            }
+        }
+        
+        function showResult(message, isError) {
+            resultDiv.innerHTML = `<div class="result ${isError ? 'error' : ''}">${message.replace(/\n/g, '<br>')}</div>`;
+        }
+    </script>
+</body>
+</html>
