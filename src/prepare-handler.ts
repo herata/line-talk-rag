@@ -23,12 +23,16 @@ export async function handlePrepare(
 		const contentType = c.req.header("content-type") || "";
 
 		if (!contentType.includes("multipart/form-data")) {
-			return c.json({ 
-				error: "このエンドポイントはファイルアップロードのみ対応しています。Content-Type: multipart/form-data を使用してください。",
-				supportedContentType: "multipart/form-data",
-				requiredField: "file",
-				supportedFileTypes: [".txt"]
-			}, 400);
+			return c.json(
+				{
+					error:
+						"このエンドポイントはファイルアップロードのみ対応しています。Content-Type: multipart/form-data を使用してください。",
+					supportedContentType: "multipart/form-data",
+					requiredField: "file",
+					supportedFileTypes: [".txt"],
+				},
+				400,
+			);
 		}
 
 		// Handle file upload
@@ -38,12 +42,21 @@ export async function handlePrepare(
 		const optionsStr = formData.get("options") as string;
 
 		if (!file) {
-			return c.json({ error: "ファイルが見つかりません。'file'フィールドでファイルをアップロードしてください。" }, 400);
+			return c.json(
+				{
+					error:
+						"ファイルが見つかりません。'file'フィールドでファイルをアップロードしてください。",
+				},
+				400,
+			);
 		}
 
 		// Check file type
 		if (!file.name.endsWith(".txt")) {
-			return c.json({ error: "テキストファイル (.txt) のみ対応しています。" }, 400);
+			return c.json(
+				{ error: "テキストファイル (.txt) のみ対応しています。" },
+				400,
+			);
 		}
 
 		// Read file content

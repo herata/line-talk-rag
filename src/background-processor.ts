@@ -46,9 +46,13 @@ export async function processMessageInBackground(
 						.map((doc, index) => {
 							// Include more metadata for better context
 							const metadata = doc.metadata || {};
-							const timestamp = metadata.timestamp ? ` [${metadata.timestamp}]` : "";
-							const participant = metadata.participant ? ` (${metadata.participant})` : "";
-							
+							const timestamp = metadata.timestamp
+								? ` [${metadata.timestamp}]`
+								: "";
+							const participant = metadata.participant
+								? ` (${metadata.participant})`
+								: "";
+
 							return `[関連情報 ${index + 1}]${timestamp}${participant}\n${doc.pageContent}`;
 						})
 						.join("\n\n");
@@ -88,7 +92,7 @@ ${ragContext}
 
 		// Use enhanced LLM for background processing with optimized parameters
 		console.log("Calling background AI with enhanced model...");
-		const aiResponse = await AI.run("@cf/meta/llama-3.2-3b-instruct", {
+		const aiResponse = await AI.run("@cf/meta/llama-3.1-8b-instruct", {
 			messages: [
 				{
 					role: "system",
@@ -101,20 +105,23 @@ ${ragContext}
 					content: contextualPrompt,
 				},
 			],
-			max_tokens: 300, // Increased for more detailed responses
+			max_tokens: 400, // Increased for higher quality model
 			temperature: 0.2, // Balanced creativity and consistency
 			stream: false,
 		});
 
-		console.log("Background AI response received:", JSON.stringify(aiResponse, null, 2));
+		console.log(
+			"Background AI response received:",
+			JSON.stringify(aiResponse, null, 2),
+		);
 
 		let responseText = "";
-		
+
 		try {
 			if (aiResponse && typeof aiResponse === "object") {
 				const response = aiResponse as Record<string, unknown>;
 				console.log("Background response keys:", Object.keys(response));
-				
+
 				// Comprehensive response extraction
 				if (response.response && typeof response.response === "string") {
 					responseText = response.response.trim();
@@ -134,22 +141,29 @@ ${ragContext}
 					if (nestedResponse && typeof nestedResponse === "object") {
 						const nested = nestedResponse as Record<string, unknown>;
 						console.log("Background: Nested object keys:", Object.keys(nested));
-						
+
 						if (nested.response && typeof nested.response === "string") {
 							responseText = nested.response.trim();
-							console.log("Background: Found response in nested 'response' field");
+							console.log(
+								"Background: Found response in nested 'response' field",
+							);
 						} else if (nested.text && typeof nested.text === "string") {
 							responseText = nested.text.trim();
 							console.log("Background: Found response in nested 'text' field");
 						} else if (nested.content && typeof nested.content === "string") {
 							responseText = nested.content.trim();
-							console.log("Background: Found response in nested 'content' field");
+							console.log(
+								"Background: Found response in nested 'content' field",
+							);
 						}
 					}
 				}
 			}
 		} catch (extractError) {
-			console.error("Background: Error extracting response text:", extractError);
+			console.error(
+				"Background: Error extracting response text:",
+				extractError,
+			);
 		}
 
 		console.log(`Background: Final extracted response text: "${responseText}"`);

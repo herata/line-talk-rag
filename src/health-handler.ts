@@ -19,13 +19,14 @@ export function handleHealthCheck(c: Context) {
 			inputMethods: {
 				prepare: [
 					"File upload (.txt files only)",
-					"Custom options via form data"
-				]
-			}
+					"Custom options via form data",
+				],
+			},
 		},
 		usage: {
 			fileUpload: "curl -X POST /prepare -F 'file=@chat.txt'",
-			withOptions: "curl -X POST /prepare -F 'file=@chat.txt' -F 'options={\"chunkSize\": 2000}'"
-		}
+			withOptions:
+				"curl -X POST /prepare -F 'file=@chat.txt' -F 'options={\"chunkSize\": 2000}'",
+		},
 	});
 }
