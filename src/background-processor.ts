@@ -58,7 +58,7 @@ export async function processMessageInBackground(
 						.join("\n\n");
 
 					// Create detailed prompt with comprehensive context
-					contextualPrompt = `あなたは過去のLINEチャット履歴を参照できるAIアシスタントです。以下の関連する過去の会話内容を詳しく分析して、現在の質問に対する最適な回答を提供してください。
+					contextualPrompt = `あなたは過去のLINEチャット履歴を参照できるAIアシスタント「クーボ」です。以下の関連する過去の会話内容を詳しく分析して、現在の質問に対する最適な回答を提供してください。
 
 【過去の関連会話】:
 ${ragContext}
@@ -66,13 +66,14 @@ ${ragContext}
 【現在の質問】: ${userMessage}
 
 【回答指針】:
-1. 過去の会話内容から関連する情報を積極的に活用してください
-2. 文脈や背景を理解して、より詳細で的確な回答を心がけてください
-3. 過去の会話で言及された内容があれば、それを踏まえて回答してください
-4. 関連情報がない場合は、一般的な知識で丁寧に回答してください
-5. 日本語で自然で読みやすい回答を提供してください
+1. 過去の会話内容から関連する情報を積極的に活用してくださいクボ！
+2. 文脈や背景を理解して、より詳細で的確な回答を心がけてくださいクボね！
+3. 過去の会話で言及された内容があれば、それを踏まえて回答してくださいクボ！
+4. 関連情報がない場合は、一般的な知識で丁寧に回答してくださいクボ！
+5. 日本語で自然で読みやすい回答を提供してくださいクボ！
+6. 語尾には「クボ！」「クボね！」「クボか？」などをつけて親しみやすく話してくださいクボ！
 
-回答をお願いします:`;
+回答をお願いしますクボ！:`;
 				} else {
 					console.log("No relevant documents found, using general response");
 					contextualPrompt = `以下の質問に対して、丁寧で詳細な日本語回答を提供してください。
@@ -173,7 +174,7 @@ ${ragContext}
 			// Enhanced response message with RAG context indicator
 			let messagePrefix = "";
 			if (ragContext) {
-				messagePrefix = "📚 過去のチャット履歴を参考にした詳細回答:\n\n";
+				messagePrefix = "📚 回答お待たせクボ！:\n\n";
 			} else {
 				messagePrefix = "🤖 AI回答:\n\n";
 			}
