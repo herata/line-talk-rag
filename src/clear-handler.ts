@@ -33,42 +33,97 @@ export async function handleClear(
 		}
 
 		// Clear all vectors from the index
-		// Note: Cloudflare Vectorize doesn't have a direct "clear all" method
-		// We use a workaround by querying all vectors and then deleting them by IDs
+		// Strategy: Use describe() to check if vectors exist, then use a different approach
+		
+		// First check if there are any vectors to delete
+		let initialStats: VectorizeIndexDetails | null = null;
+		try {
+			initialStats = await c.env.VECTORIZE.describe();
+			console.log("Initial database stats:", initialStats);
+		} catch (error) {
+			console.warn("Could not get initial database stats:", error);
+		}
+
+		// If no vectors exist, return early
+		if (initialStats && initialStats.vectorsCount === 0) {
+			return c.json({
+				message: "ベクトルデータベースは既に空です",
+				status: "ALREADY_EMPTY",
+				deletedCount: 0,
+				timestamp: new Date().toISOString(),
+			});
+		}
 
 		let totalDeleted = 0;
 		let hasMoreVectors = true;
+		let attempts = 0;
+		const maxAttempts = 50; // Prevent infinite loops
 
-		while (hasMoreVectors) {
-			// Query vectors to get their IDs (we use a small dummy vector for querying)
-			const dummyVector = new Array(1024).fill(0.1); // Compatible with bge-m3 embeddings
+		while (hasMoreVectors && attempts < maxAttempts) {
+			attempts++;
+			
+			try {
+				// Use a dummy vector to query existing vectors
+				// Create a more realistic dummy vector for the embedding space
+				const dummyVector = Array.from({ length: 1024 }, () => Math.random() * 0.1);
 
-			const queryResult = await c.env.VECTORIZE.query(dummyVector, {
-				topK: 1000, // Process in batches of 1000
-				returnMetadata: false,
-				returnValues: false,
-			});
+				const queryResult = await c.env.VECTORIZE.query(dummyVector, {
+					topK: 100, // Smaller batch size for more stable processing
+				});
 
-			if (queryResult.matches.length === 0) {
-				hasMoreVectors = false;
-				break;
+				if (queryResult.matches.length === 0) {
+					console.log("No more vectors found, clearing complete");
+					hasMoreVectors = false;
+					break;
+				}
+
+				// Extract vector IDs
+				const vectorIds = queryResult.matches.map((match) => match.id);
+
+				// Delete this batch of vectors
+				await c.env.VECTORIZE.deleteByIds(vectorIds);
+
+				totalDeleted += vectorIds.length;
+				console.log(
+					`Deleted batch of ${vectorIds.length} vectors (total: ${totalDeleted}, attempt: ${attempts})`,
+				);
+
+				// If we got fewer than the requested topK, we might be near the end
+				if (queryResult.matches.length < 100) {
+					// Do one more check to see if there are remaining vectors
+					const checkResult = await c.env.VECTORIZE.query(dummyVector, {
+						topK: 1,
+					});
+					if (checkResult.matches.length === 0) {
+						hasMoreVectors = false;
+					}
+				}
+
+				// Small delay to avoid overwhelming the API
+				await new Promise(resolve => setTimeout(resolve, 100));
+
+			} catch (queryError) {
+				console.warn(`Query attempt ${attempts} failed:`, queryError);
+				
+				// If the error suggests no vectors exist, we're done
+				const errorMsg = queryError instanceof Error ? queryError.message : String(queryError);
+				if (errorMsg.includes("no vectors") || errorMsg.includes("empty")) {
+					hasMoreVectors = false;
+					break;
+				}
+				
+				// For other errors, try a few more times
+				if (attempts >= 3) {
+					throw queryError; // Re-throw after a few attempts
+				}
+				
+				// Wait a bit before retrying
+				await new Promise(resolve => setTimeout(resolve, 1000));
 			}
+		}
 
-			// Extract vector IDs
-			const vectorIds = queryResult.matches.map((match) => match.id);
-
-			// Delete this batch of vectors
-			await c.env.VECTORIZE.deleteByIds(vectorIds);
-
-			totalDeleted += vectorIds.length;
-			console.log(
-				`Deleted batch of ${vectorIds.length} vectors (total: ${totalDeleted})`,
-			);
-
-			// If we got fewer than the requested topK, we've reached the end
-			if (queryResult.matches.length < 1000) {
-				hasMoreVectors = false;
-			}
+		if (attempts >= maxAttempts) {
+			console.warn(`Reached maximum attempts (${maxAttempts}), stopping clear operation`);
 		}
 
 		console.log(`Successfully deleted ${totalDeleted} vectors from Vectorize`);
