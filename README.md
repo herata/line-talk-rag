@@ -288,6 +288,46 @@ LINE Messaging APIからのWebhookを処理し、RAGベースの応答を生成�
 - **メタデータ活用**: 時間・参加者情報を含む高精度コンテキスト理解
 - **セキュリティ**: LINE署名検証による安全な通信
 
+### `/clear` - ベクトルデータベースクリア
+
+ベクトルデータベース（Cloudflare Vectorize）内の全てのベクトルデータを削除します。
+
+#### Request Format
+
+```bash
+# Clear all vectors from the database
+curl -X DELETE https://your-worker.workers.dev/clear
+```
+
+#### レスポンス例
+
+```json
+{
+  "message": "ベクトルデータベースが正常にクリアされました",
+  "status": "SUCCESS",
+  "deletedCount": 156,
+  "beforeStats": {
+    "vectorCount": 156
+  },
+  "afterStats": {
+    "vectorCount": 0
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+#### 機能
+- **完全クリア**: Vectorizeインデックス内の全ベクトルを削除
+- **バッチ処理**: 大量のベクトルを効率的に処理
+- **統計情報**: クリア前後のデータベース統計
+- **エラーハンドリング**: 詳細なエラー情報とステータス
+- **セキュリティ**: 適切な権限チェックとエラー処理
+
+#### 注意事項
+- **不可逆操作**: 削除されたデータは復元できません
+- **完全削除**: 全てのチャット履歴とベクトルデータが削除されます
+- **RAG機能停止**: クリア後はRAG検索が機能しません（新しいデータをアップロードするまで）
+
 ### `/health` - ヘルスチェック
 
 システムの稼働状況と各コンポーネントの状態を確認します。
@@ -435,7 +475,7 @@ const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 ## 📚 Documentation
 
-- **API仕様**: このREADME.mdに統合済み - `/prepare`と`/webhook`エンドポイントの完全仕様
+- **API仕様**: このREADME.mdに統合済み - `/prepare`、`/webhook`、`/clear`エンドポイントの完全仕様
 - **サンプル**: `sample_line_chat.txt` - テスト用チャットファイル
 - **デモ**: `upload-demo.html` - インタラクティブなデモインターフェース
 - **テスト**: `test_file_upload.sh` - 自動テストスクリプト
